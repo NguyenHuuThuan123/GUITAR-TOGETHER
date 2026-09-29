@@ -27,7 +27,7 @@ import {
 export default function SongDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
-  const { songs, toggleFavoriteSong, addComment, updateSong } = useBandStore();
+  const { songs, isHydrated, toggleFavoriteSong, addComment, updateSong } = useBandStore();
 
   const song = songs.find((s) => s.id === resolvedParams.id);
   const [semitones, setSemitones] = useState(0);
@@ -36,6 +36,14 @@ export default function SongDetailPage({ params }: { params: Promise<{ id: strin
   const [activeTab, setActiveTab] = useState<'sheet' | 'comments' | 'history'>('sheet');
 
   if (!song) {
+    if (!isHydrated) {
+      return (
+        <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-6">
+          <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mb-3"></div>
+          <p className="text-sm text-neutral-400">Đang tải hợp âm bài hát...</p>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-neutral-950 text-white flex flex-col">
         <Navbar />

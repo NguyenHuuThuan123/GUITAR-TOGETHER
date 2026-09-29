@@ -37,7 +37,10 @@ function ensureDataFile() {
 export async function GET() {
   try {
     const data = ensureDataFile();
-    return NextResponse.json(data);
+    return NextResponse.json({
+      ...data,
+      lastUpdated: data.lastUpdated || new Date().toISOString(),
+    });
   } catch (error) {
     console.error('Lỗi API GET /api/band-data:', error);
     return NextResponse.json({ error: 'Không thể đọc dữ liệu' }, { status: 500 });
@@ -58,7 +61,12 @@ export async function POST(request: Request) {
     };
 
     fs.writeFileSync(DATA_FILE, JSON.stringify(updatedData, null, 2), 'utf-8');
-    return NextResponse.json({ success: true, lastUpdated: updatedData.lastUpdated });
+    return NextResponse.json({
+      success: true,
+      lastUpdated: updatedData.lastUpdated,
+      songs: updatedData.songs,
+      setlists: updatedData.setlists,
+    });
   } catch (error) {
     console.error('Lỗi API POST /api/band-data:', error);
     return NextResponse.json({ error: 'Không thể lưu dữ liệu' }, { status: 500 });

@@ -8,6 +8,7 @@ import { parseChordProText } from './chord-engine/parser';
 
 interface BandStore {
   // Dữ liệu
+  isHydrated: boolean;
   currentUser: User;
   currentBand: Band;
   songs: Song[];
@@ -58,6 +59,8 @@ const loadSavedState = () => {
   return null;
 };
 
+let lastSyncTime = '';
+
 const saveState = async (state: Partial<BandStore>) => {
   if (typeof window === 'undefined') return;
   try {
@@ -75,7 +78,7 @@ const saveState = async (state: Partial<BandStore>) => {
 
   // Đồng bộ lên máy chủ trung tâm để tất cả thiết bị khác trong ban nhạc cùng nhìn thấy ngay
   try {
-    await fetch('/api/band-data', {
+    const res = await fetch('/api/band-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -83,6 +86,12 @@ const saveState = async (state: Partial<BandStore>) => {
         setlists: state.setlists,
       }),
     });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.lastUpdated) {
+        lastSyncTime = data.lastUpdated;
+      }
+    }
   } catch (e) {
     console.warn('Không thể đồng bộ lên máy chủ:', e);
   }
@@ -90,6 +99,7 @@ const saveState = async (state: Partial<BandStore>) => {
 
 export const useBandStore = create<BandStore>((set, get) => {
   return {
+    isHydrated: false,
     currentUser: CURRENT_USER,
     currentBand: MOCK_BAND,
     songs: MOCK_SONGS,
@@ -107,7 +117,7 @@ export const useBandStore = create<BandStore>((set, get) => {
     hydrateFromStorage: async () => {
       // 1. Nạp nhanh từ localStorage nếu có để tránh giật giao diện
       const saved = loadSavedState();
-      if (saved) {
+      if (saved && !get().isHydrated) {
         const rawSongs = saved.songs && saved.songs.length > 0 ? saved.songs : MOCK_SONGS;
         const refreshedSongs = rawSongs.map((s: Song) => ({
           ...s,
@@ -115,6 +125,7 @@ export const useBandStore = create<BandStore>((set, get) => {
         }));
 
         set({
+          isHydrated: true,
           songs: refreshedSongs,
           setlists: saved.setlists && saved.setlists.length > 0 ? saved.setlists : MOCK_SETLISTS,
           stageSettings: saved.stageSettings ? { ...get().stageSettings, ...saved.stageSettings } : get().stageSettings,
@@ -126,6 +137,12 @@ export const useBandStore = create<BandStore>((set, get) => {
         const res = await fetch('/api/band-data');
         if (res.ok) {
           const serverData = await res.json();
+          // Nếu dữ liệu trên máy chủ không có thay đổi và đã hydrate rồi thì BỎ QUA để không re-render giao diện!
+          if (serverData.lastUpdated && serverData.lastUpdated === lastSyncTime && get().isHydrated) {
+            return;
+          }
+          lastSyncTime = serverData.lastUpdated || '';
+
           if (serverData.songs && serverData.songs.length > 0) {
             let finalSongs = serverData.songs;
 
@@ -149,6 +166,7 @@ export const useBandStore = create<BandStore>((set, get) => {
             }));
 
             set({
+              isHydrated: true,
               songs: refreshedSongs,
               setlists: serverData.setlists && serverData.setlists.length > 0 ? serverData.setlists : (saved?.setlists || MOCK_SETLISTS),
             });
@@ -168,6 +186,8 @@ export const useBandStore = create<BandStore>((set, get) => {
         }
       } catch (err) {
         console.warn('Lỗi đồng bộ dữ liệu từ máy chủ:', err);
+      } finally {
+        set({ isHydrated: true });
       }
     },
 

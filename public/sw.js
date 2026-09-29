@@ -33,6 +33,13 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Không chặn hay can thiệp vào các API hoặc file động của Next.js
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/')) {
+    return;
+  }
+
   // Network first, fallback to cache for offline usage
   if (event.request.method !== 'GET') return;
 
