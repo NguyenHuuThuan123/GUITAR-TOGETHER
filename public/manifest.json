@@ -1,0 +1,17 @@
+{
+  "name": "BAND GUITAR TOGETHER - Sân Khấu & Tập Luyện",
+  "short_name": "GUITAR TOGETHER",
+  "description": "Ứng dụng BAND GUITAR TOGETHER - Quản lý hợp âm, setlist và biểu diễn sân khấu chuyên nghiệp cho ban nhạc",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#0a0a0a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png"
+    }
+  ]
+}

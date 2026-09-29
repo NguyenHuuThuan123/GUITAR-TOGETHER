@@ -1,0 +1,160 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum BandRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum SectionType {
+  INTRO
+  VERSE
+  PRE_CHORUS
+  CHORUS
+  BRIDGE
+  SOLO
+  OUTRO
+  CUSTOM
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String?
+  email         String         @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  image         String?
+  memberships   BandMember[]
+  createdSongs  Song[]         @relation("SongCreator")
+  songEdits     SongVersion[]
+  comments      SongComment[]
+  favorites     FavoriteSong[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Band {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  logoUrl     String?
+  inviteCode  String         @unique @default(cuid())
+  members     BandMember[]
+  songs       Song[]
+  setlists    Setlist[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model BandMember {
+  id        String   @id @default(cuid())
+  bandId    String
+  userId    String
+  role      BandRole @default(EDITOR)
+  joinedAt  DateTime @default(now())
+
+  band Band @relation(fields: [bandId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bandId, userId])
+}
+
+model Song {
+  id              String          @id @default(cuid())
+  bandId          String
+  title           String
+  artist          String?
+  originalKey     String          // Ví dụ: "C", "Am", "F#m", "Bb"
+  tempoBpm        Int?            // Tempo để auto-scroll và metronome
+  timeSignature   String?         @default("4/4")
+  capo            Int?            @default(0) // Vị trí kẹp capo gốc
+  rawContent      String          // Nội dung chuẩn theo cú pháp [Chord] và section headers
+  parsedJson      Json?           // Cache cấu trúc AST đã parse để render cực nhanh
+  tags            String[]        // Ví dụ: ["Ballad", "Acoustic", "Pop", "Rock"]
+  performanceNote String?         // Ghi chú chung (VD: "Key solo đoạn 2, outro fade out")
+  isPublic        Boolean         @default(false)
+  shareSlug       String?         @unique
+
+  createdById     String
+  createdBy       User            @relation("SongCreator", fields: [createdById], references: [id])
+  band            Band            @relation(fields: [bandId], references: [id], onDelete: Cascade)
+
+  versions        SongVersion[]
+  setlistItems    SetlistSong[]
+  comments        SongComment[]
+  favorites       FavoriteSong[]
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([bandId, title])
+}
+
+model SongVersion {
+  id         String   @id @default(cuid())
+  songId     String
+  content    String   // Snapshot rawContent lúc lưu
+  note       String?  // Ghi chú phiên bản (VD: "Đổi hợp âm điệp khúc")
+  editedById String
+  editedBy   User     @relation(fields: [editedById], references: [id])
+  createdAt  DateTime @default(now())
+
+  song Song @relation(fields: [songId], references: [id], onDelete: Cascade)
+}
+
+model Setlist {
+  id          String        @id @default(cuid())
+  bandId      String
+  name        String        // Ví dụ: "Show Acoustic Pub 20/10", "Tập tuần 42"
+  description String?
+  eventDate   DateTime?
+  songs       SetlistSong[]
+  band        Band          @relation(fields: [bandId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model SetlistSong {
+  id             String   @id @default(cuid())
+  setlistId      String
+  songId         String
+  orderIndex     Int      // Thứ tự bài trong buổi diễn (0, 1, 2...)
+  keyOverride    String?  // Tông riêng cho buổi diễn này
+  capoOverride   Int?     // Capo riêng cho buổi này
+  notesOverride  String?  // Lưu ý riêng cho buổi này
+
+  setlist Setlist @relation(fields: [setlistId], references: [id], onDelete: Cascade)
+  song    Song    @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([setlistId, orderIndex])
+}
+
+model SongComment {
+  id        String   @id @default(cuid())
+  songId    String
+  userId    String
+  content   String   // Ghi chú trao đổi, cue nhạc công
+  createdAt DateTime @default(now())
+
+  song Song @relation(fields: [songId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FavoriteSong {
+  id        String   @id @default(cuid())
+  userId    String
+  songId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song Song @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, songId])
+}

@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: #0a0a0a;
+  color: #ededed;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Tùy chỉnh thanh cuộn êm mắt cho sân khấu */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #121212;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d97706;
+}
+
+/* Định dạng in ấn sạch đẹp để in giấy dự phòng trên sân khấu */
+@media print {
+  @page {
+    margin: 1.5cm;
+    size: A4 portrait;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+
+  header, nav, button, .print\:hidden {
+    display: none !important;
+  }
+
+  .text-amber-400 {
+    color: #b45309 !important;
+    font-weight: bold !important;
+  }
+
+  .text-neutral-100 {
+    color: #000000 !important;
+  }
+
+  .border-neutral-800 {
+    border-color: #e5e5e5 !important;
+  }
+
+  .bg-neutral-900, .bg-neutral-950 {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}
