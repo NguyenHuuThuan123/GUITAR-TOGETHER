@@ -58,7 +58,7 @@ const loadSavedState = () => {
   return null;
 };
 
-const saveState = (state: Partial<BandStore>) => {
+const saveState = async (state: Partial<BandStore>) => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(
@@ -71,6 +71,20 @@ const saveState = (state: Partial<BandStore>) => {
     );
   } catch (e) {
     console.error('Failed to save to local storage:', e);
+  }
+
+  // Đồng bộ lên máy chủ trung tâm để tất cả thiết bị khác trong ban nhạc cùng nhìn thấy ngay
+  try {
+    await fetch('/api/band-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        songs: state.songs,
+        setlists: state.setlists,
+      }),
+    });
+  } catch (e) {
+    console.warn('Không thể đồng bộ lên máy chủ:', e);
   }
 };
 
@@ -90,11 +104,11 @@ export const useBandStore = create<BandStore>((set, get) => {
       theme: 'dark',
     },
 
-    hydrateFromStorage: () => {
+    hydrateFromStorage: async () => {
+      // 1. Nạp nhanh từ localStorage nếu có để tránh giật giao diện
       const saved = loadSavedState();
       if (saved) {
         const rawSongs = saved.songs && saved.songs.length > 0 ? saved.songs : MOCK_SONGS;
-        // Tự động phân tích lại các bài hát đã lưu bằng parser mới nhất
         const refreshedSongs = rawSongs.map((s: Song) => ({
           ...s,
           parsedData: s.rawContent ? parseChordProText(s.rawContent) : s.parsedData,
@@ -105,6 +119,55 @@ export const useBandStore = create<BandStore>((set, get) => {
           setlists: saved.setlists && saved.setlists.length > 0 ? saved.setlists : MOCK_SETLISTS,
           stageSettings: saved.stageSettings ? { ...get().stageSettings, ...saved.stageSettings } : get().stageSettings,
         });
+      }
+
+      // 2. Tải dữ liệu mới nhất từ máy chủ (Server Central Storage)
+      try {
+        const res = await fetch('/api/band-data');
+        if (res.ok) {
+          const serverData = await res.json();
+          if (serverData.songs && serverData.songs.length > 0) {
+            let finalSongs = serverData.songs;
+
+            // Nếu máy client này (ví dụ localhost) có bài hát trong localStorage mà trên server chưa có, hợp nhất lên server
+            if (saved?.songs && saved.songs.length > 0) {
+              const serverIds = new Set(serverData.songs.map((s: Song) => s.id));
+              const localExtras = saved.songs.filter((s: Song) => !serverIds.has(s.id));
+              if (localExtras.length > 0) {
+                finalSongs = [...localExtras, ...serverData.songs];
+                fetch('/api/band-data', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ songs: finalSongs, setlists: serverData.setlists || saved.setlists }),
+                }).catch(() => {});
+              }
+            }
+
+            const refreshedSongs = finalSongs.map((s: Song) => ({
+              ...s,
+              parsedData: s.rawContent ? parseChordProText(s.rawContent) : s.parsedData,
+            }));
+
+            set({
+              songs: refreshedSongs,
+              setlists: serverData.setlists && serverData.setlists.length > 0 ? serverData.setlists : (saved?.setlists || MOCK_SETLISTS),
+            });
+
+            // Ghi đè lại localStorage để các lần sau nạp nhanh
+            try {
+              localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify({
+                  songs: refreshedSongs,
+                  setlists: serverData.setlists || get().setlists,
+                  stageSettings: get().stageSettings,
+                })
+              );
+            } catch {}
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi đồng bộ dữ liệu từ máy chủ:', err);
       }
     },
 
